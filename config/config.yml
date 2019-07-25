@@ -1,0 +1,4 @@
+---
+source: '/mnt/c/Users/stk/Downloads/excel/src'
+destination: '/mnt/c/Users/stk/Downloads/excel/dst'
+template: '/mnt/c/Users/stk/Downloads/excel/tmpl/template.yml'

@@ -1,70 +1,97 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"github.com/samuelgarciastk/excel-converter/converter"
-	"github.com/samuelgarciastk/excel-converter/template"
 	"github.com/samuelgarciastk/excel-converter/utils"
-	"gopkg.in/yaml.v2"
-	"io/ioutil"
-	"path/filepath"
-	"strings"
+	"log"
+	"os"
 )
 
+const configPath = "config/config.yml"
+
 func main() {
-	conf := loadConf()
-
-	srcFileNames, err := utils.ListFiles(conf.Source, fileFilter())
-	if err != nil {
-		fmt.Printf("Cannot list files in directory: %s\n", conf.Source)
+	flag.Usage = func() {
+		_, _ = fmt.Fprintf(flag.CommandLine.Output(), "Usage: see %s (cli|server) --help\n", os.Args[0])
+		flag.PrintDefaults()
 	}
 
-	for _, srcFileName := range srcFileNames {
-		fileConverter := genConverter(srcFileName, conf)
-		if fileConverter != nil {
-			fileConverter.Convert()
-		}
+	if len(os.Args) < 2 {
+		flag.Usage()
+		os.Exit(1)
 	}
-}
 
-func fileFilter() func(string) bool {
-	return func(file string) bool {
-		return !strings.HasPrefix(file, "~")
-	}
-}
-
-func genConverter(fileName string, conf Conf) converter.Converter {
-	fileTemplate := template.DetermineTemplate(fileName)
-	switch ext := filepath.Ext(fileName); ext {
-	case ".xlsx":
-		return &converter.Excel{
-			Source:   filepath.Join(conf.Source, fileName),
-			Target:   filepath.Join(conf.Target, fileName),
-			Template: fileTemplate,
-		}
+	switch os.Args[1] {
+	case "cli":
+		cliParse(os.Args[2:])
+	case "server":
+		serverParse(os.Args[2:])
 	default:
-		fmt.Printf("Extension [%s] is not supported.", ext)
-		return nil
+		flag.Usage()
 	}
 }
 
-// Config
-const confPath = "conf/conf.yml"
+func cliParse(flags []string) {
+	cliFlag := flag.NewFlagSet("cli", flag.ExitOnError)
+	cliFlag.Usage = func() {
+		_, _ = fmt.Fprintf(cliFlag.Output(), "Usage of cli: %s cli [OPTIONS]\n", os.Args[0])
+		cliFlag.PrintDefaults()
+	}
 
-type Conf struct {
-	Source string
-	Target string
+	cfg := cliFlag.String("c", configPath, "configuration file")
+	src := cliFlag.String("s", "", "source directory")
+	dst := cliFlag.String("d", "", "destination directory")
+	tmpl := cliFlag.String("t", "", "template directory")
+
+	err := cliFlag.Parse(flags)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if cliFlag.Parsed() {
+		config, err := utils.Load(*cfg)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if *src != "" {
+			config.Source = *src
+		}
+		if *dst != "" {
+			config.Destination = *dst
+		}
+		if *tmpl != "" {
+			config.Template = *tmpl
+		}
+
+		converter.BatchConvert(*config)
+	}
 }
 
-func loadConf() Conf {
-	conf := Conf{}
-	bytes, err := ioutil.ReadFile(confPath)
-	if err != nil {
-		panic("Cannot find configuration file.")
+func serverParse(flags []string) {
+	serverFlag := flag.NewFlagSet("server", flag.ExitOnError)
+	serverFlag.Usage = func() {
+		_, _ = fmt.Fprintf(serverFlag.Output(), "Usage of server: %s server [OPTIONS] (start|stop|restart)\n", os.Args[0])
+		serverFlag.PrintDefaults()
 	}
-	err = yaml.Unmarshal(bytes, &conf)
+
+	cfg := serverFlag.String("c", configPath, "configuration file")
+	operation := serverFlag.Arg(0)
+
+	err := serverFlag.Parse(flags)
 	if err != nil {
-		panic("Malformed configuration.")
+		log.Fatal(err)
 	}
-	return conf
+
+	if serverFlag.Parsed() {
+		if operation == "" {
+			serverFlag.Usage()
+			os.Exit(1)
+		}
+		config, err := utils.Load(*cfg)
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Printf("Server config: %v", config)
+	}
 }
