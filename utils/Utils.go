@@ -44,8 +44,7 @@ func CopyFile(src, dst string) error {
 		return err
 	}
 	defer func() {
-		openErr := srcFile.Close()
-		if err == nil {
+		if openErr := srcFile.Close(); err == nil {
 			err = openErr
 		}
 	}()
@@ -54,10 +53,8 @@ func CopyFile(src, dst string) error {
 	if err != nil {
 		return err
 	}
-
 	defer func() {
-		createErr := dstFile.Close()
-		if err == nil {
+		if createErr := dstFile.Close(); err == nil {
 			err = createErr
 		}
 	}()
@@ -65,6 +62,5 @@ func CopyFile(src, dst string) error {
 	if _, err = io.Copy(dstFile, srcFile); err != nil {
 		return err
 	}
-
 	return dstFile.Sync()
 }

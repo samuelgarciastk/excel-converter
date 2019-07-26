@@ -20,8 +20,7 @@ func (excel *Excel) Convert() error {
 	}
 	srcSheetMap := srcFile.Sheet
 
-	err = utils.CopyFile(excel.Template.File, excel.Destination)
-	if err != nil {
+	if err = utils.CopyFile(excel.Template.File, excel.Destination); err != nil {
 		return fmt.Errorf("cannot copy template file: %s, due to %v", excel.Template.File, err)
 	}
 
@@ -66,8 +65,7 @@ func (excel *Excel) Convert() error {
 		}
 	}
 
-	err = dstFile.Save(excel.Destination)
-	if err != nil {
+	if err = dstFile.Save(excel.Destination); err != nil {
 		return fmt.Errorf("cannot save converted file: %s, due to %v", excel.Destination, err)
 	}
 	return nil

@@ -21,6 +21,7 @@ func BatchConvert(config utils.Config) {
 		log.Fatalf("cannot read template file %s, due to %v", config.Template, err)
 	}
 
+	// concurrent
 	fileNum := 0
 	failedNum := 0
 	for _, srcFileName := range srcFileNames {

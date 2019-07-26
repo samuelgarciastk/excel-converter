@@ -1,4 +1,5 @@
 ---
-source: '/mnt/c/Users/stk/Downloads/excel/src'
-destination: '/mnt/c/Users/stk/Downloads/excel/dst'
-template: '/mnt/c/Users/stk/Downloads/excel/tmpl/template.yml'
+source.dir: '/mnt/c/Users/stk/Downloads/excel/src'
+destination.dir: '/mnt/c/Users/stk/Downloads/excel/dst'
+template.file: '/mnt/c/Users/stk/Downloads/excel/tmpl/template.yml'
+server.port: 8008

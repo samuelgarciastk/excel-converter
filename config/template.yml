@@ -1,11 +1,11 @@
 ---
-file: '/mnt/c/Users/stk/Downloads/excel/tmpl/moban.xlsx'
+file: '/mnt/c/Users/stk/Downloads/excel/tmpl/template.xlsx'
 sheets:
   'INV':
-    src_start: 18
-    src_end: 480
-    dst_sheet: '表体'
-    dst_start: 2
+    src.start: 18
+    src.end: 480
+    dst.sheet: '表体'
+    dst.start: 2
     mapping:
       1: 3
       2: 2
@@ -16,10 +16,10 @@ sheets:
       7: 4
       8: 1
 #  'PKL':
-#    src_start: 18
-#    src_end: 480
-#    dst_sheet: '表体'
-#    dst_start: 2
+#    src.start: 18
+#    src.end: 480
+#    dst.sheet: '表体'
+#    dst.start: 2
 #    mapping:
 #      1: 3
 #      2: 2
@@ -30,10 +30,10 @@ sheets:
 #      7: 4
 #      8: 1
 #  'CRT':
-#    src_start: 14
-#    src_end: 476
-#    dst_sheet: '表体'
-#    dst_start: 2
+#    src.start: 14
+#    src.end: 476
+#    dst.sheet: '表体'
+#    dst.start: 2
 #    mapping:
 #      1: 3
 #      2: 2

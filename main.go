@@ -5,8 +5,12 @@ import (
 	"fmt"
 	"github.com/samuelgarciastk/excel-converter/converter"
 	"github.com/samuelgarciastk/excel-converter/utils"
+	"io/ioutil"
 	"log"
+	"net/http"
 	"os"
+	"path/filepath"
+	"strconv"
 )
 
 const configPath = "config/config.yml"
@@ -71,12 +75,11 @@ func cliParse(flags []string) {
 func serverParse(flags []string) {
 	serverFlag := flag.NewFlagSet("server", flag.ExitOnError)
 	serverFlag.Usage = func() {
-		_, _ = fmt.Fprintf(serverFlag.Output(), "Usage of server: %s server [OPTIONS] (start|stop|restart)\n", os.Args[0])
+		_, _ = fmt.Fprintf(serverFlag.Output(), "Usage of server: %s server [OPTIONS]\n", os.Args[0])
 		serverFlag.PrintDefaults()
 	}
 
 	cfg := serverFlag.String("c", configPath, "configuration file")
-	operation := serverFlag.Arg(0)
 
 	err := serverFlag.Parse(flags)
 	if err != nil {
@@ -84,14 +87,76 @@ func serverParse(flags []string) {
 	}
 
 	if serverFlag.Parsed() {
-		if operation == "" {
-			serverFlag.Usage()
-			os.Exit(1)
-		}
 		config, err := utils.Load(*cfg)
 		if err != nil {
 			log.Fatal(err)
 		}
-		fmt.Printf("Server config: %v", config)
+
+		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			convert(w, r, *config)
+		})
+		log.Printf("Starting server...")
+		err = http.ListenAndServe(":"+strconv.Itoa(config.ServerPort), nil)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+}
+
+func convert(w http.ResponseWriter, r *http.Request, config utils.Config) {
+	if r.URL.Path != "/" {
+		http.Error(w, "404 not found.", http.StatusNotFound)
+		return
+	}
+
+	switch r.Method {
+	case "POST":
+		_ = r.ParseMultipartForm(32 << 20)
+		file, header, err := r.FormFile("file")
+		if err != nil {
+			_, _ = fmt.Fprintf(w, "Error retrieving the file.\n")
+			return
+		}
+		defer func() {
+			if fileErr := file.Close(); err == nil {
+				err = fileErr
+			}
+		}()
+
+		tempFile, err := ioutil.TempFile(os.TempDir(), header.Filename)
+		if err != nil {
+			_, _ = fmt.Fprintf(w, "%v\n", err)
+			return
+		}
+
+		fileBytes, err := ioutil.ReadAll(file)
+		if err != nil {
+			_, _ = fmt.Fprintf(w, "%v\n", err)
+			return
+		}
+		if _, err = tempFile.Write(fileBytes); err != nil {
+			_, _ = fmt.Fprintf(w, "%v\n", err)
+			return
+		}
+		if err = tempFile.Close(); err != nil {
+			_, _ = fmt.Fprintf(w, "%v\n", err)
+			return
+		}
+		log.Printf("Successfully uploaded file.")
+
+		template, err := utils.ReadTemplate(config.Template)
+		if err != nil {
+			_, _ = fmt.Fprintf(w, "cannot read template file: %s, due to %v\n", config.Template, err)
+			return
+		}
+
+		err = converter.ConvertFile(tempFile.Name(), filepath.Join(config.Destination, header.Filename), *template)
+		if err != nil {
+			_, _ = fmt.Fprintf(w, "cannot convert file: %s, due to %v", tempFile.Name(), err)
+			return
+		}
+		_, _ = fmt.Fprintf(w, "Convert file [%s] successfully.", header.Filename)
+	default:
+		_, _ = fmt.Fprintf(w, "Sorry, only POST method is supported.\n")
 	}
 }

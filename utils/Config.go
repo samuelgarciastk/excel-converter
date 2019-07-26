@@ -7,9 +7,10 @@ import (
 )
 
 type Config struct {
-	Source      string
-	Destination string
-	Template    string
+	Source      string `yaml:"source.dir"`
+	Destination string `yaml:"destination.dir"`
+	Template    string `yaml:"template.file"`
+	ServerPort  int    `yaml:"server.port"`
 }
 
 func Load(path string) (*Config, error) {
@@ -18,8 +19,7 @@ func Load(path string) (*Config, error) {
 	if err != nil {
 		return conf, fmt.Errorf("cannot find configuration file: %s, due to %v", path, err)
 	}
-	err = yaml.Unmarshal(bytes, conf)
-	if err != nil {
+	if err = yaml.Unmarshal(bytes, conf); err != nil {
 		return conf, fmt.Errorf("malformed configuration file: %s, due to %v", path, err)
 	}
 	return conf, nil
