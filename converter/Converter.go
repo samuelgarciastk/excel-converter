@@ -25,11 +25,8 @@ func BatchConvert(config utils.Config) {
 	fileNum := 0
 	failedNum := 0
 	for _, srcFileName := range srcFileNames {
-		err = ConvertFile(filepath.Join(config.Source, srcFileName),
-			filepath.Join(config.Destination, srcFileName),
-			*template)
 		fileNum++
-		if err != nil {
+		if err = ConvertFile(filepath.Join(config.Source, srcFileName), filepath.Join(config.Destination, srcFileName), *template); err != nil {
 			failedNum++
 			log.Printf("cannot convert file: %s, due to %v", srcFileName, err)
 		}

@@ -7,13 +7,14 @@ import (
 	"github.com/samuelgarciastk/excel-converter/utils"
 	"io/ioutil"
 	"log"
+	"mime/multipart"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
 )
 
-const configPath = "config/config.yml"
+const configPath = "config.yml"
 
 func main() {
 	flag.Usage = func() {
@@ -46,10 +47,9 @@ func cliParse(flags []string) {
 	cfg := cliFlag.String("c", configPath, "configuration file")
 	src := cliFlag.String("s", "", "source directory")
 	dst := cliFlag.String("d", "", "destination directory")
-	tmpl := cliFlag.String("t", "", "template directory")
+	tmpl := cliFlag.String("t", "", "template file")
 
-	err := cliFlag.Parse(flags)
-	if err != nil {
+	if err := cliFlag.Parse(flags); err != nil {
 		log.Fatal(err)
 	}
 
@@ -81,8 +81,7 @@ func serverParse(flags []string) {
 
 	cfg := serverFlag.String("c", configPath, "configuration file")
 
-	err := serverFlag.Parse(flags)
-	if err != nil {
+	if err := serverFlag.Parse(flags); err != nil {
 		log.Fatal(err)
 	}
 
@@ -92,71 +91,75 @@ func serverParse(flags []string) {
 			log.Fatal(err)
 		}
 
-		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		http.HandleFunc("/upload", func(w http.ResponseWriter, r *http.Request) {
 			convert(w, r, *config)
 		})
 		log.Printf("Starting server...")
-		err = http.ListenAndServe(":"+strconv.Itoa(config.ServerPort), nil)
-		if err != nil {
+		if err = http.ListenAndServe(":"+strconv.Itoa(config.ServerPort), nil); err != nil {
 			log.Fatal(err)
 		}
 	}
 }
 
 func convert(w http.ResponseWriter, r *http.Request, config utils.Config) {
-	if r.URL.Path != "/" {
-		http.Error(w, "404 not found.", http.StatusNotFound)
-		return
-	}
-
 	switch r.Method {
 	case "POST":
-		_ = r.ParseMultipartForm(32 << 20)
-		file, header, err := r.FormFile("file")
-		if err != nil {
-			_, _ = fmt.Fprintf(w, "Error retrieving the file.\n")
-			return
-		}
-		defer func() {
-			if fileErr := file.Close(); err == nil {
-				err = fileErr
-			}
-		}()
-
-		tempFile, err := ioutil.TempFile(os.TempDir(), header.Filename)
-		if err != nil {
-			_, _ = fmt.Fprintf(w, "%v\n", err)
-			return
-		}
-
-		fileBytes, err := ioutil.ReadAll(file)
-		if err != nil {
-			_, _ = fmt.Fprintf(w, "%v\n", err)
-			return
-		}
-		if _, err = tempFile.Write(fileBytes); err != nil {
-			_, _ = fmt.Fprintf(w, "%v\n", err)
-			return
-		}
-		if err = tempFile.Close(); err != nil {
-			_, _ = fmt.Fprintf(w, "%v\n", err)
-			return
-		}
-		log.Printf("Successfully uploaded file.")
-
 		template, err := utils.ReadTemplate(config.Template)
 		if err != nil {
 			_, _ = fmt.Fprintf(w, "cannot read template file: %s, due to %v\n", config.Template, err)
 			return
 		}
 
-		err = converter.ConvertFile(tempFile.Name(), filepath.Join(config.Destination, header.Filename), *template)
-		if err != nil {
-			_, _ = fmt.Fprintf(w, "cannot convert file: %s, due to %v", tempFile.Name(), err)
-			return
+		if err := r.ParseMultipartForm(32 << 20); err != nil {
+			_, _ = fmt.Fprintln(w, err)
 		}
-		_, _ = fmt.Fprintf(w, "Convert file [%s] successfully.", header.Filename)
+		files := r.MultipartForm.File["files"]
+
+		for _, header := range files {
+			fileName, err := saveFile(header)
+			if err != nil {
+				_, _ = fmt.Fprintln(w, err)
+			}
+
+			if err = converter.ConvertFile(fileName, filepath.Join(config.Destination, header.Filename), *template); err != nil {
+				_, _ = fmt.Fprintf(w, "cannot convert file: %s, due to %v", fileName, err)
+				return
+			}
+			_, _ = fmt.Fprintf(w, "Convert file [%s] successfully.", header.Filename)
+		}
 	default:
 		_, _ = fmt.Fprintf(w, "Sorry, only POST method is supported.\n")
 	}
+}
+
+func saveFile(header *multipart.FileHeader) (string, error) {
+	file, err := header.Open()
+	if err != nil {
+		return "", fmt.Errorf("Error retrieving the file: %s, due to %v\n", header.Filename, err)
+	}
+
+	tempFile, err := ioutil.TempFile(os.TempDir(), header.Filename)
+	if err != nil {
+		return "", err
+	}
+
+	fileBytes, err := ioutil.ReadAll(file)
+	if err != nil {
+		return "", err
+	}
+
+	if _, err = tempFile.Write(fileBytes); err != nil {
+		return "", err
+	}
+
+	if err = tempFile.Close(); err != nil {
+		return "", err
+	}
+
+	if err = file.Close(); err != nil {
+		return "", err
+	}
+
+	log.Printf("Successfully uploaded file: %s", header.Filename)
+	return tempFile.Name(), nil
 }
